@@ -8,8 +8,10 @@
   :root { --bg:#0b0d12; --panel:#141821; --line:#232a38; --txt:#e8ecf3; --dim:#8b94a7; --acc:#3fd8e0; }
   * { box-sizing:border-box; margin:0; }
   body { background:var(--bg); color:var(--txt); font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; height:100vh; display:flex; overflow:hidden; }
-  #view { flex:1; position:relative; min-width:0; }
+  #view { flex:1; position:relative; min-width:0; cursor:pointer; }
   #view canvas { display:block; }
+  #box-audio { position:absolute; bottom:22px; left:50%; transform:translateX(-50%); z-index:2; padding:10px 20px; border-radius:99px; background:#1a2230cc; backdrop-filter:blur(6px); font-size:13px; }
+  #box-audio.on { background:#3fd8e0cc; color:#06282b; font-weight:700; }
   #panel { width:340px; background:var(--panel); border-left:1px solid var(--line); padding:18px; overflow-y:auto; display:flex; flex-direction:column; gap:14px; }
   h1 { font-size:15px; letter-spacing:.14em; font-weight:600; }
   h1 span { color:var(--acc); }
@@ -38,9 +40,9 @@
 </style>
 </head>
 <body>
-<div id="view"></div>
+<div id="view"><button id="box-audio">▶ start audio</button></div>
 <div id="panel">
-  <h1>tonada<span>·</span>edge <span class="hint" id="z-name">virtual device</span></h1>
+  <h1>tonada<span>·</span>edge <span class="hint" id="z-name">simulator · interactive</span></h1>
   <div class="card">
     <div id="np-title">—</div>
     <div id="np-meta"></div>

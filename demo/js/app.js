@@ -37,8 +37,9 @@ function signals() {
   };
 }
 
-let lastTrack = '', queued = false;
+let lastTrack = '', queued = false, lastD = null;
 function applyDecision(d) {
+  lastD = d;
   $('np-title').textContent = d.title || '—';
   $('np-meta').textContent = `${d.track || '—'} · ${d.mood || '—'} · ${d.bpm || '—'} bpm · energy ${(d.energy || 0).toFixed(2)}`;
   $('energy-bar').style.width = ((d.energy || 0) * 100) + '%';
@@ -71,6 +72,8 @@ const LIVE = !!(window.HART_DATA && window.HART_DATA.id);
 if (LIVE) {
   $('sim-card').style.display = 'none';
   $('day-btn').style.display = 'none';
+  $('audio-btn').textContent = '▶ listen to this box';
+  $('box-audio').textContent = '▶ listen to this box';
   const paintLive = d => { if (d && d.id) { $('z-name').textContent = d.name + ' · ' + d.city + ', ' + d.country; applyDecision(d); } };
   paintLive(window.HART_DATA);
   addEventListener('hart:data', e => paintLive(e.detail));
@@ -92,16 +95,22 @@ $('kill').onclick = e => {
   decide();
 };
 
-if (LIVE) $('audio-btn').textContent = '▶ listen to this box';
-$('audio-btn').onclick = e => {
+function toggleAudio() {
   if (!state.audio) { audio.start(); state.audio = true; state.playing = true; }
   else state.playing = audio.toggle();
-  e.target.textContent = state.playing ? '⏸ mute' : (LIVE ? '▶ listen to this box' : '▶ resume');
-  e.target.classList.toggle('on', state.playing);
+  if (state.playing && lastD) audio.setDecision(lastD);   // feed the engine immediately — don't wait for the next repaint/push
+  for (const id of ['audio-btn', 'box-audio']) {
+    const b = $(id); if (!b) continue;
+    b.textContent = state.playing ? '⏸ mute' : (LIVE ? '▶ listen to this box' : '▶ start audio');
+    b.classList.toggle('on', state.playing);
+  }
   if (!LIVE) scene.setPower(state.playing);
   log(state.playing ? '▶ playing' : (LIVE ? '⏸ muted' : '⏸ paused — LED off'));
   if (!LIVE) decide();
-};
+}
+$('audio-btn').onclick = toggleAudio;
+$('box-audio').onclick = e => { e.stopPropagation(); toggleAudio(); };
+$('view').onclick = toggleAudio;   // the box itself is the play button
 
 // --- "a day in 60s": scripted sweep 06:00 -> 23:00 with weather + traffic arcs
 $('day-btn').onclick = () => {
