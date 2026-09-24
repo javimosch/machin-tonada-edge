@@ -45,7 +45,11 @@ fleet page deep-links each zone into it. Both harts are strict-CSP.
                           ▼                                  ▼
                bkn control plane (dk1)                 hart artifact (strict CSP)
                hooks -> scripts -> store collections   self-contained single HTML
-               cron (signal drift) -> fleet hook       three.js + wasm + GLB inlined
+               cron (signal drift) -> fleet hook       three.js + wasm + GLB +
+                                                      generated catalog inlined
+
+          rbm4 (CPU, no GPU): musicgen-small -> one 8s mp3 per catalog track,
+          embedded in the hart — the box plays the real generated clip
                           │ GET ?op=fleet
                           ▼
                hart refresh --url (30s) -> window.HART_DATA -> fleet hart
@@ -59,8 +63,8 @@ fleet page deep-links each zone into it. Both harts are strict-CSP.
 - `src/control-plane.src` — standalone MFL control plane (dev alternative to bkn)
 - `bkn/` — control plane as bkn scripts/hooks/cron (`setup.sh` deploys)
 - `demo/` — device page (three.js + WebAudio) and fleet dashboard
-- `deploy/` — vps1 fleet: `tonada-edge@.service` template + `deploy.sh` (build → scp → systemd)
-- `assets/` — Blender box model, GLB export, wasm build
+- `deploy/` — vps1 fleet: `tonada-edge@.service` template + `deploy.sh` (build → scp → systemd); `gen-catalog.py` — MusicGen small catalog generator (transformers, CPU — runs on rbm4)
+- `assets/` — Blender box model, GLB export, wasm build, `clips/` — 14 generated catalog mp3s embedded in the device hart
 - `build.sh` — native + wasm builds; `build-hart.py` — self-contained artifacts
 
 ## Run it
