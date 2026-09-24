@@ -4,12 +4,13 @@ function hash(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^=
 function rng(seed) { let a = seed; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
 const MOODS = {
-  calm:        { scale: [0, 4, 7, 11, 14], root: 48, pad: 'sawtooth', arp: 'sine',     hats: false, kick: false, stab: false },
-  warm:        { scale: [0, 5, 7, 12, 16], root: 45, pad: 'triangle', arp: 'sine',     hats: false, kick: false, stab: false },
-  bright:      { scale: [0, 4, 6, 7, 11],  root: 50, pad: 'sawtooth', arp: 'triangle', hats: true,  kick: false, stab: false },
-  driving:     { scale: [0, 3, 5, 7, 10],  root: 43, pad: 'sawtooth', arp: 'square',   hats: true,  kick: true,  stab: false },
-  celebratory: { scale: [0, 4, 7, 12, 16], root: 48, pad: 'sawtooth', arp: 'triangle', hats: true,  kick: true,  stab: true  },
-  late:        { scale: [0, 3, 7, 8, 10],  root: 41, pad: 'triangle', arp: 'sine',     hats: false, kick: false, stab: false },
+  // pads/arps = candidate waveforms (track seed picks); arpRate = arp note every N 16ths; res = filter Q
+  calm:        { scale: [0, 4, 7, 11, 14], root: 48, pads: ['sine', 'triangle'],     arps: ['sine', 'triangle'],     hats: false, kick: false, stab: false, arpRate: 4, res: 1.2 },
+  warm:        { scale: [0, 5, 7, 12, 16], root: 45, pads: ['triangle', 'sawtooth'], arps: ['sine', 'triangle'],     hats: false, kick: false, stab: false, arpRate: 2, res: 0.7 },
+  bright:      { scale: [0, 4, 6, 7, 11],  root: 50, pads: ['sawtooth', 'triangle'], arps: ['triangle', 'square'],   hats: true,  kick: false, stab: false, arpRate: 1, res: 0.8 },
+  driving:     { scale: [0, 3, 5, 7, 10],  root: 43, pads: ['sawtooth', 'square'],   arps: ['square', 'sawtooth'],   hats: true,  kick: true,  stab: false, arpRate: 1, res: 1.6 },
+  celebratory: { scale: [0, 4, 7, 12, 16], root: 48, pads: ['sawtooth', 'square'],   arps: ['triangle', 'square'],   hats: true,  kick: true,  stab: true,  arpRate: 1, res: 1.0 },
+  late:        { scale: [0, 3, 7, 8, 10],  root: 41, pads: ['triangle', 'sine'],     arps: ['sine'],                 hats: false, kick: false, stab: false, arpRate: 8, res: 2.8 },
 };
 const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
 
@@ -52,18 +53,35 @@ export class AudioEngine {
     }
     const cfg = MOODS[d.mood] || MOODS.calm;
     const r = rng(hash(d.track));
+    const pick = a => a[Math.floor(r() * a.length)];
     const g = ctx.createGain(); g.gain.value = 0; g.gain.setTargetAtTime(0.9, t, 0.8); g.connect(this.master);
-    const flt = ctx.createBiquadFilter(); flt.type = 'lowpass'; flt.frequency.value = 500 + (d.energy ?? 0.5) * 4200; flt.connect(g);
+    const flt = ctx.createBiquadFilter(); flt.type = 'lowpass'; flt.frequency.value = 500 + (d.energy ?? 0.5) * 4200; flt.Q.value = cfg.res;
+    // per-track stereo placement — cheap but very audible differentiation
+    if (ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = (r() * 2 - 1) * 0.55; flt.connect(p); p.connect(g); }
+    else flt.connect(g);
     const deck = { id: d.track, cfg, r, gain: g, flt, nodes: [], stepDur: 60 / (d.bpm || 96) / 4 };
-    // seeded 4-chord progression over scale degrees
     const deg = cfg.scale;
     deck.chords = [0, 1, 2, 3].map(() => Math.floor(r() * (deg.length - 2)));
     deck.arpPat = Array.from({ length: 16 }, () => Math.floor(r() * deg.length));
-    deck.bassPat = cfg.stab ? [1,0,0,1, 0,0,1,0, 0,0,1,0, 1,0,0,0] : [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0];
+    // per-track voice: timbre, register, rhythm feel
+    deck.arpWave = pick(cfg.arps);
+    deck.padWave = pick(cfg.pads);
+    deck.oct = pick([-12, 0, 0, 12]);
+    deck.swing = r() * 0.22;
+    deck.arpGate = Array.from({ length: 16 }, () => r() < 0.35 + r() * 0.6);
+    deck.arpLen = 0.9 + r() * 1.8;
+    deck.detune = 2 + r() * 14;
+    deck.padGain = 0.035 + r() * 0.05;
+    deck.padVoicing = pick([[0, 7], [0, 12], [0, 3], [0, 10]]);
+    deck.bassPat = cfg.stab ? [1,0,0,1, 0,0,1,0, 0,0,1,0, 1,0,0,0]
+      : pick([[1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+              [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
+              [1,0,0,0, 0,0,0,1, 0,0,1,0, 0,0,0,0],
+              [1,0,0,1, 0,0,1,0, 0,0,1,0, 0,0,1,0]]);
     // pad voices always running (chord held 4 steps of 16 = 1 bar)
     deck.padOsc = [0, 1].map(i => {
-      const o = ctx.createOscillator(); o.type = cfg.pad; o.detune.value = i ? 7 : -6;
-      const og = ctx.createGain(); og.gain.value = 0.05;
+      const o = ctx.createOscillator(); o.type = deck.padWave; o.detune.value = i ? deck.detune : -deck.detune;
+      const og = ctx.createGain(); og.gain.value = deck.padGain;
       o.connect(og); og.connect(flt); o.start(); deck.nodes.push(o); return o;
     });
     this.deck = deck;
@@ -85,18 +103,19 @@ export class AudioEngine {
     const ctx = this.ctx, dk = this.deck, cfg = dk.cfg, deg = cfg.scale, r = dk.r;
     const bar = Math.floor(s / 16), st = s % 16;
     const chordRoot = cfg.root + deg[dk.chords[bar]];
-    if (st === 0) dk.padOsc.forEach((o, i) => o.frequency.setTargetAtTime(mtof(chordRoot + [0, 7][i]), t, 0.08));
+    const tt = t + (st % 2 === 1 ? dk.stepDur * dk.swing : 0);   // per-track swing on off-16ths
+    if (st === 0) dk.padOsc.forEach((o, i) => o.frequency.setTargetAtTime(mtof(chordRoot + dk.padVoicing[i]), t, 0.08));
     // bass
-    if (dk.bassPat[st]) this.tone('sine', mtof(chordRoot - 12), t, dk.stepDur * 2.2, 0.30);
-    // arp (energy-gated)
-    if ((this.want.energy ?? 0) > 0.35 && st % 2 === 0) {
-      const note = cfg.root + 12 + deg[dk.arpPat[st] % deg.length] + (cfg.stab ? 12 : 0);
-      this.tone(cfg.arp, mtof(note), t, dk.stepDur * 1.6, 0.06 + (this.want.energy ?? 0.5) * 0.10);
+    if (dk.bassPat[st]) this.tone('sine', mtof(chordRoot - 12), tt, dk.stepDur * 2.2, 0.30);
+    // arp (energy-gated; rate/density/octave/wave all per-track)
+    if ((this.want.energy ?? 0) > 0.35 && st % cfg.arpRate === 0 && dk.arpGate[st]) {
+      const note = cfg.root + 12 + dk.oct + deg[dk.arpPat[st] % deg.length] + (cfg.stab ? 12 : 0);
+      this.tone(dk.arpWave, mtof(note), tt, dk.stepDur * dk.arpLen, 0.06 + (this.want.energy ?? 0.5) * 0.10);
     }
     // hats
-    if (cfg.hats && st % 2 === 1) this.hat(t, st % 4 === 3 ? 0.10 : 0.05);
+    if (cfg.hats && st % 2 === 1) this.hat(tt, st % 4 === 3 ? 0.10 : 0.05);
     // kick
-    if (cfg.kick && st % 4 === 0) this.kick(t);
+    if (cfg.kick && st % 4 === 0) this.kick(tt);
   }
 
   tone(type, f, t, dur, vol) {

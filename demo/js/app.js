@@ -50,7 +50,7 @@ function applyDecision(d) {
   src.className = 'badge ' + (offline ? 'cache' : 'live');
   $('reason').textContent = d.reason || '';
   scene.setLED(d);
-  if (liveMode()) scene.setPower(!!d.online);  // the box itself is playing; audio btn is just a monitor
+  if (liveMode()) scene.setPower(!!d.online && state.playing);  // LED = box online AND you're listening
   if (state.audio && state.playing) audio.setDecision(d);
   if (d.track !== lastTrack) {
     if (lastTrack) log(`♪ ${d.title}  [${d.mood} · e${(d.energy || 0).toFixed(2)}${d.source === 'cache' ? ' · cache' : ''}]`);
@@ -134,7 +134,7 @@ function toggleAudio() {
     b.textContent = state.playing ? '⏸ mute' : (liveMode() ? '▶ listen to this box' : '▶ start audio');
     b.classList.toggle('on', state.playing);
   }
-  if (!liveMode()) scene.setPower(state.playing);
+  scene.setPower(state.playing && (liveMode() ? lastD?.online !== false : true));
   log(state.playing ? '▶ playing' : (liveMode() ? '⏸ muted' : '⏸ paused — LED off'));
   if (!liveMode()) decide();
 }

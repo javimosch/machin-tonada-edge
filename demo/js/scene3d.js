@@ -85,9 +85,9 @@ export function initScene(container, glbUrl, onReady) {
           k = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * led.pulseHz * Math.PI * 2)) ** 2;
         }
         ledMat.emissive.copy(led.color);
-        ledMat.emissiveIntensity = (0.4 + 1.6 * k) * led.level + 0.2;
+        ledMat.emissiveIntensity = (1.0 + 3.4 * k) * led.level + 0.25;
         ledLight.color.copy(led.color);
-        ledLight.intensity = 1.1 * k * led.level;
+        ledLight.intensity = 2.6 * k * led.level;
       }
     }
     if (box) box.rotation.y = Math.sin(t * 0.15) * 0.06;
