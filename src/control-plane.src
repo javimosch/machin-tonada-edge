@@ -1,0 +1,126 @@
+type Zone struct { id string  name string  brand string  city string  country string  lat float  lon float  tz_off int }
+type Cnt struct { c int }
+type OccRow struct { occupancy float  pos_rate int }
+type Sig struct { occupancy float  pos_rate int  weather string  event int }
+type Beat struct { ts int  track string  title string  mood string  energy float  bpm int  source string  reason string  uptime_s int }
+type FleetItem struct { id string  name string  brand string  city string  country string  tz_off int  online int  last_seen int  track string  title string  mood string  energy float  bpm int  source string  reason string  occupancy float  pos_rate int  weather string  event int }
+type HistRow struct { ts int  energy float  mood string  track string }
+
+var DB = 0
+
+func zones_seed() {
+    return []Zone{
+        Zone{id:"norrland-sthlm", name:"Norrland Flagship", brand:"Norrland Outdoor", city:"Stockholm", country:"SE", lat:59.33, lon:18.07, tz_off:1},
+        Zone{id:"norrland-sg",    name:"Norrland Orchard",  brand:"Norrland Outdoor", city:"Singapore", country:"SG", lat:1.30,  lon:103.83, tz_off:8},
+        Zone{id:"cafeberg-mitte", name:"Café Berg Mitte",   brand:"Café Berg",        city:"Berlin",    country:"DE", lat:52.52, lon:13.40,  tz_off:1}
+    }
+}
+
+func init_db(path) {
+    DB = sqlite_open(path)
+    sqlite_exec(DB, "CREATE TABLE IF NOT EXISTS zones(id TEXT PRIMARY KEY, name, brand, city, country, lat REAL, lon REAL, tz_off INT)")
+    sqlite_exec(DB, "CREATE TABLE IF NOT EXISTS signals(zone_id TEXT PRIMARY KEY, occupancy REAL, pos_rate INT, weather, event INT, updated_ms INT)")
+    sqlite_exec(DB, "CREATE TABLE IF NOT EXISTS beats(zone_id TEXT PRIMARY KEY, ts INT, track, title, mood, energy REAL, bpm INT, source, reason, uptime_s INT)")
+    sqlite_exec(DB, "CREATE TABLE IF NOT EXISTS hist(id INTEGER PRIMARY KEY AUTOINCREMENT, zone_id, ts INT, energy REAL, mood, track)")
+    n := parse(sqlite_query(DB, "SELECT count(*) AS c FROM zones"), []Cnt{})
+    if len(n) > 0 && n[0].c == 0 {
+        for _, z := range zones_seed() {
+            sqlite_exec(DB, "INSERT INTO zones VALUES(?,?,?,?,?,?,?,?)", []string{z.id, z.name, z.brand, z.city, z.country, str(z.lat), str(z.lon), str(z.tz_off)})
+            w := "clear"
+            if z.city == "Stockholm" { w = "rain" }
+            if z.city == "Berlin" { w = "clouds" }
+            sqlite_exec(DB, "INSERT INTO signals VALUES(?,?,?,?,?,?)", []string{z.id, "0.45", "10", w, "0", str(now_ms())})
+        }
+    }
+}
+
+func cors(r) (o) { o = with_header(r, "Access-Control-Allow-Origin", "*")  o = with_header(o, "Access-Control-Allow-Headers", "content-type")  o = with_header(o, "Access-Control-Allow-Methods", "GET,POST,OPTIONS") }
+
+type IdRow struct { id string }
+
+func zone_ids() {
+    rows := parse(sqlite_query(DB, "SELECT id FROM zones"), []IdRow{})
+    ids := []string{}
+    for _, r := range rows { ids = append(ids, r.id) }
+    return ids
+}
+
+func sim_drift() {
+    for true {
+        for i, zid := range zone_ids() {
+            rows := parse(sqlite_query(DB, "SELECT occupancy,pos_rate FROM signals WHERE zone_id=?", []string{zid}), []OccRow{})
+            if len(rows) == 0 { continue }
+            occ := rows[0].occupancy + (noise2(float(now_ms()) / 90000.0, float(i) * 7.3) * 0.10)
+            pos := float(rows[0].pos_rate) + noise2(float(now_ms()) / 70000.0, float(i) * 3.1) * 2.0
+            if occ < 0.05 { occ = 0.05 }  if occ > 0.98 { occ = 0.98 }
+            if pos < 0.0 { pos = 0.0 }  if pos > 45.0 { pos = 45.0 }
+            sqlite_exec(DB, "UPDATE signals SET occupancy=?, pos_rate=?, updated_ms=? WHERE zone_id=?", []string{str(occ), str(int(pos)), str(now_ms()), zid})
+        }
+        sleep(15000)
+    }
+}
+
+func fleet_json() {
+    items := []FleetItem{}
+    zrows := parse(sqlite_query(DB, "SELECT id,name,brand,city,country,lat,lon,tz_off FROM zones ORDER BY id"), []Zone{})
+    for _, z := range zrows {
+        it := FleetItem{}
+        it.id = z.id  it.name = z.name  it.brand = z.brand  it.city = z.city  it.country = z.country
+        it.tz_off = z.tz_off
+        b := parse(sqlite_query(DB, "SELECT ts,track,title,mood,energy,bpm,source,reason FROM beats WHERE zone_id=?", []string{it.id}), []Beat{})
+        if len(b) > 0 { it.last_seen = b[0].ts  it.track = b[0].track  it.title = b[0].title  it.mood = b[0].mood  it.energy = b[0].energy  it.bpm = b[0].bpm  it.source = b[0].source  it.reason = b[0].reason }
+        s := parse(sqlite_query(DB, "SELECT occupancy,pos_rate,weather,event FROM signals WHERE zone_id=?", []string{it.id}), []Sig{})
+        if len(s) > 0 { it.occupancy = s[0].occupancy  it.pos_rate = s[0].pos_rate  it.weather = s[0].weather  it.event = s[0].event }
+        if it.last_seen > 0 && now_ms() - it.last_seen < 20000 { it.online = 1 }
+        items = append(items, it)
+    }
+    return json(items)
+}
+
+func handle(req) (res) {
+    if req.method == "OPTIONS" { return cors(response("204 No Content", "text/plain", "")) }
+    p := req.path
+    qi := index(p, "?")
+    if qi >= 0 { p = substr(p, 0, qi) }
+    zid := query(req, "id")
+    if p == "/health" { return cors(ok_json("{\"ok\":true}")) }
+    if p == "/api/v1/fleet" { return cors(ok_json(fleet_json())) }
+    if p == "/api/v1/catalog" { return cors(ok_json(catalog_json())) }
+    if p == "/api/v1/zone/config" {
+        z := parse(sqlite_query(DB, "SELECT id,name,brand,city,country,lat,lon,tz_off FROM zones WHERE id=?", []string{zid}), []Zone{})
+        if len(z) == 0 { return cors(not_found()) }
+        return cors(ok_json("{\"zone\":" + json(z[0]) + ",\"catalog\":" + catalog_json() + ",\"rules\":\"edge-core v1\"}"))
+    }
+    if p == "/api/v1/zone/signals" {
+        if req.method == "POST" {
+            s := parse(req.body, Sig{})
+            sqlite_exec(DB, "UPDATE signals SET occupancy=?, pos_rate=?, weather=?, event=?, updated_ms=? WHERE zone_id=?", []string{str(s.occupancy), str(s.pos_rate), s.weather, str(s.event), str(now_ms()), zid})
+            return cors(ok_json("{\"ok\":true}"))
+        }
+        rows := sqlite_query(DB, "SELECT occupancy,pos_rate,weather,event FROM signals WHERE zone_id=?", []string{zid})
+        return cors(ok_json(rows))
+    }
+    if p == "/api/v1/zone/beat" && req.method == "POST" {
+        b := parse(req.body, Beat{})
+        b.ts = now_ms()
+        sqlite_exec(DB, "INSERT INTO beats VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(zone_id) DO UPDATE SET ts=excluded.ts,track=excluded.track,title=excluded.title,mood=excluded.mood,energy=excluded.energy,bpm=excluded.bpm,source=excluded.source,reason=excluded.reason,uptime_s=excluded.uptime_s", []string{zid, str(b.ts), b.track, b.title, b.mood, str(b.energy), str(b.bpm), b.source, b.reason, str(b.uptime_s)})
+        sqlite_exec(DB, "INSERT INTO hist(zone_id,ts,energy,mood,track) VALUES(?,?,?,?,?)", []string{zid, str(b.ts), str(b.energy), b.mood, b.track})
+        sqlite_exec(DB, "DELETE FROM hist WHERE zone_id=? AND id NOT IN (SELECT id FROM hist WHERE zone_id=? ORDER BY id DESC LIMIT 96)", []string{zid, zid})
+        return cors(ok_json("{\"ok\":true}"))
+    }
+    if p == "/api/v1/zone/history" { return cors(ok_json(sqlite_query(DB, "SELECT ts,energy,mood,track FROM hist WHERE zone_id=? ORDER BY id DESC LIMIT 48", []string{zid}))) }
+    if p == "/" { return cors(ok_html("<h1>tonada-edge control plane</h1><p>/api/v1/fleet · /api/v1/catalog · /api/v1/zone/config|signals|beat|history?id=&lt;zone&gt;</p>")) }
+    return cors(not_found())
+}
+
+func main() {
+    a := args()
+    port := 8470
+    dbp := "control-plane.db"
+    if len(a) > 1 { port = parse_int(a[1]) }
+    if len(a) > 2 { dbp = a[2] }
+    init_db(dbp)
+    go sim_drift()
+    println("control-plane on :" + str(port) + " db=" + dbp)
+    serve(port, func(req) { return handle(req) })
+}

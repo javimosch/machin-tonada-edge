@@ -1,0 +1,5 @@
+[
+  {"id":"norrland-sthlm","name":"Norrland Flagship","brand":"Norrland Outdoor","city":"Stockholm","country":"SE","lat":59.33,"lon":18.07,"tz_off":1},
+  {"id":"norrland-sg","name":"Norrland Orchard","brand":"Norrland Outdoor","city":"Singapore","country":"SG","lat":1.30,"lon":103.83,"tz_off":8},
+  {"id":"cafeberg-mitte","name":"Café Berg Mitte","brand":"Café Berg","city":"Berlin","country":"DE","lat":52.52,"lon":13.40,"tz_off":1}
+]

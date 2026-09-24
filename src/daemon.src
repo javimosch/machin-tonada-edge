@@ -1,0 +1,125 @@
+type Cfg struct { server string  zone string  interval int  data_dir string }
+type SigIn struct { occupancy float  pos_rate int  weather string  event int }
+
+var START_MS = 0
+
+func argval(a, key, def) {
+    for _, x := range a {
+        if has_prefix(x, key + "=") { return substr(x, len(key) + 1, len(x)) }
+    }
+    return def
+}
+
+func jget(s, p) (v) { v, _ = json_get(s, p) }
+
+func fmt_min(t) { m := t % 60  if m < 10 { return str(t / 60) + ":0" + str(m) }  return str(t / 60) + ":" + str(m) }
+
+func store_minute(tz_off) {
+    m := int((now_ms() / 60000) % 1440) + tz_off * 60
+    m = m % 1440
+    if m < 0 { m = m + 1440 }
+    return m
+}
+
+func store_weekday(tz_off) {
+    f := time_fields(now_ms() / 1000 + tz_off * 3600)
+    if f[6] == 0 || f[6] == 6 { return 0 }
+    return 1
+}
+
+func hook(cfg, body) {
+    code, resp, err := http_request("POST", cfg.server + "/v1/hooks/tonada", []string{"Content-Type: application/json"}, body)
+    if err != "" || code != 200 { return "" }
+    return resp
+}
+
+func run(cfg) {
+    mkdir(cfg.data_dir)
+    state_file := cfg.data_dir + "/state-" + cfg.zone + ".json"
+    tz := 0
+    last_track := ""
+    last_src := ""
+    println("[tonada-edge] zone=" + cfg.zone + " server=" + cfg.server + " interval=" + str(cfg.interval) + "ms")
+    for true {
+        // pull cached state, then refresh config + signals; whatever survives
+        // the network becomes this tick's source of truth
+        old := read_file(state_file)
+        ocfg := jget(old, ".config")
+        osig := jget(old, ".signals")
+        cfgj := ocfg
+        cbody := hook(cfg, "{\"op\":\"config\",\"zone\":\"" + cfg.zone + "\"}")
+        if cbody != "" { cfgj = cbody }
+        zj := jget(cfgj, ".zone")
+        if zj != "" { tz = parse_int(jget(zj, ".tz_off")) }
+        sigj := osig
+        sbody := hook(cfg, "{\"op\":\"signals\",\"zone\":\"" + cfg.zone + "\"}")
+        online := 0
+        sig := SigIn{occupancy:0.4, pos_rate:5, weather:"clouds", event:0}
+        if sbody != "" {
+            sigj = sbody
+            rows := parse(sbody, []SigIn{})
+            if len(rows) > 0 { sig = rows[0]  online = 1 }
+        } else if osig != "" {
+            r2 := parse(osig, []SigIn{})
+            if len(r2) > 0 { sig = r2[0] }
+        }
+        if cfgj != "" || sigj != "" { write_file(state_file, "{\"config\":" + cfgj + ",\"signals\":" + sigj + "}") }
+        s := Signals{time_min:store_minute(tz), weekday:store_weekday(tz), weather:sig.weather, occupancy:sig.occupancy, pos_rate:sig.pos_rate, event:sig.event, online:online}
+        d := decide_sig(s)
+        up := (now_ms() - START_MS) / 1000
+        if online == 1 {
+            beat := "{\"op\":\"beat\",\"zone\":\"" + cfg.zone + "\",\"track\":\"" + d.track + "\",\"title\":\"" + d.title + "\",\"mood\":\"" + d.mood + "\",\"energy\":" + str(d.energy) + ",\"bpm\":" + str(d.bpm) + ",\"source\":\"" + d.source + "\",\"reason\":\"" + d.reason + "\",\"uptime_s\":" + str(up) + "}"
+            hook(cfg, beat)
+        }
+        if d.track != last_track || d.source != last_src {
+            tag := "LIVE"
+            if d.source == "cache" { tag = "OFFLINE·CACHE" }
+            println("[" + fmt_min(s.time_min) + "] ♪ " + d.title + " (" + d.mood + " e" + str(d.energy) + " " + str(d.bpm) + "bpm) " + tag + " — " + d.reason)
+            last_track = d.track
+            last_src = d.source
+        }
+        sleep(cfg.interval)
+    }
+}
+
+func status(cfg) {
+    b := hook(cfg, "{\"op\":\"signals\",\"zone\":\"" + cfg.zone + "\"}")
+    online := 0
+    if b != "" { online = 1 }
+    println("{\"zone\":\"" + cfg.zone + "\",\"server_online\":" + str(online) + ",\"signals\":" + b + "}")
+}
+
+func health(cfg) {
+    b := hook(cfg, "{\"op\":\"fleet\"}")
+    if b == "" { println("{\"ok\":false,\"server\":\"" + cfg.server + "\"}")  exit(1) }
+    println("{\"ok\":true,\"server\":\"" + cfg.server + "\"}")
+}
+
+func guide() {
+    println("tonada-edge — edge player daemon (machin/MFL)")
+    println("")
+    println("USAGE")
+    println("  tonada-edge run --server=<url> --zone=<id> [--interval=5000] [--data-dir=.tonada-edge]")
+    println("  tonada-edge status --server=<url> --zone=<id>   one-shot probe + current signals")
+    println("  tonada-edge health --server=<url>               exit 0 iff control plane reachable")
+    println("  tonada-edge guide                               this text")
+    println("  tonada-edge version")
+    println("")
+    println("The daemon polls zone signals from a bkn hook (control plane), decides")
+    println("locally (edge-core), heartbeats the decision back, and falls back to the")
+    println("cached catalog + last known signals when the uplink is down.")
+}
+
+func main() {
+    START_MS = now_ms()
+    a := args()
+    cmd := "run"
+    if len(a) > 1 && !has_prefix(a[1], "--") { cmd = a[1] }
+    cfg := Cfg{server:argval(a, "--server", "http://localhost:8470"), zone:argval(a, "--zone", "norrland-sthlm"), interval:parse_int(argval(a, "--interval", "5000")), data_dir:argval(a, "--data-dir", ".tonada-edge")}
+    if cmd == "run" { run(cfg)  return }
+    if cmd == "status" { status(cfg)  return }
+    if cmd == "health" { health(cfg)  return }
+    if cmd == "guide" { guide()  return }
+    if cmd == "version" { println("tonada-edge 0.1.0 · edge-core v1 · machin/MFL")  return }
+    guide()
+}

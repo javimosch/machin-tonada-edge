@@ -1,0 +1,6 @@
+func main() {
+    a := args()
+    if len(a) > 1 { println(decide_json(a[1]))  return }
+    println("edge-cli: pass a signals JSON arg, e.g.")
+    println("  edge-cli '{\"time_min\":780,\"weekday\":1,\"weather\":\"rain\",\"occupancy\":0.7,\"pos_rate\":18,\"event\":0,\"online\":1}'")
+}

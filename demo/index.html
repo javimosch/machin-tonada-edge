@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>tonada-edge — virtual device</title>
+<style>
+  :root { --bg:#0b0d12; --panel:#141821; --line:#232a38; --txt:#e8ecf3; --dim:#8b94a7; --acc:#3fd8e0; }
+  * { box-sizing:border-box; margin:0; }
+  body { background:var(--bg); color:var(--txt); font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; height:100vh; display:flex; overflow:hidden; }
+  #view { flex:1; position:relative; min-width:0; }
+  #view canvas { display:block; }
+  #panel { width:340px; background:var(--panel); border-left:1px solid var(--line); padding:18px; overflow-y:auto; display:flex; flex-direction:column; gap:14px; }
+  h1 { font-size:15px; letter-spacing:.14em; font-weight:600; }
+  h1 span { color:var(--acc); }
+  .card { background:#0e1219; border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
+  #np-title { font-size:17px; font-weight:600; }
+  #np-meta { color:var(--dim); font-size:12px; margin-top:2px; }
+  .badge { display:inline-block; padding:1px 8px; border-radius:99px; font-size:11px; border:1px solid var(--line); }
+  .badge.live { color:#7ee787; border-color:#2ea04355; }
+  .badge.cache { color:#ffb454; border-color:#b07a2a55; }
+  #energy-wrap { margin-top:10px; height:6px; background:#1c2230; border-radius:3px; overflow:hidden; }
+  #energy-bar { height:100%; width:0%; background:linear-gradient(90deg,#3fd8e0,#e0489a); transition:width .5s; }
+  #reason { color:var(--dim); font-size:12px; margin-top:8px; min-height:2.6em; }
+  .row { display:flex; justify-content:space-between; align-items:center; gap:10px; margin:9px 0; }
+  .row label { color:var(--dim); font-size:12px; }
+  .row output { font-size:12px; min-width:56px; text-align:right; }
+  input[type=range] { flex:1; accent-color:var(--acc); }
+  select { background:#0e1219; color:var(--txt); border:1px solid var(--line); border-radius:6px; padding:3px 8px; font:inherit; font-size:12px; }
+  .tog { display:flex; gap:8px; }
+  button { background:#1a2230; color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font:inherit; font-size:12px; cursor:pointer; }
+  button:hover { border-color:var(--acc); }
+  button.on { background:var(--acc); color:#06282b; font-weight:700; }
+  #kill.on { background:#ff5b4d; color:#2a0805; border-color:#ff5b4d; }
+  #audio-btn { width:100%; padding:10px; font-size:13px; }
+  .hint { color:var(--dim); font-size:11px; }
+  #log { font-size:11px; color:var(--dim); max-height:110px; overflow-y:auto; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<div id="view"></div>
+<div id="panel">
+  <h1>tonada<span>·</span>edge <span class="hint">virtual device</span></h1>
+  <div class="card">
+    <div id="np-title">—</div>
+    <div id="np-meta"></div>
+    <div id="energy-wrap"><div id="energy-bar"></div></div>
+    <div style="margin-top:6px"><span id="np-src" class="badge live">LIVE</span></div>
+    <div id="reason"></div>
+  </div>
+  <div class="card">
+    <div class="row"><label>time of day</label><input id="s-time" type="range" min="0" max="1439" value="780"><output id="o-time">13:00</output></div>
+    <div class="row"><label>weather</label><select id="s-weather"><option>clear</option><option>clouds</option><option selected>rain</option><option>snow</option></select><output></output></div>
+    <div class="row"><label>foot traffic</label><input id="s-occ" type="range" min="0" max="100" value="75"><output id="o-occ">75%</output></div>
+    <div class="row"><label>POS rate /hr</label><input id="s-pos" type="range" min="0" max="40" value="20"><output id="o-pos">20</output></div>
+    <div class="row"><label>weekday</label><div class="tog"><button id="s-wd" class="on">weekday</button><button id="s-ev">local event</button></div><output></output></div>
+    <div class="row"><label>uplink</label><div class="tog"><button id="kill">CUT THE NETWORK</button></div><output></output></div>
+  </div>
+  <button id="audio-btn">▶ start audio</button>
+  <button id="day-btn">▶ a day in 60s</button>
+  <div class="card"><div id="log"></div></div>
+  <div class="hint">MFL decision engine → wasm. Same source compiles to the 2&nbsp;MB native edge daemon.</div>
+</div>
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

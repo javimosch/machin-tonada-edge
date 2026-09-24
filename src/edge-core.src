@@ -1,0 +1,106 @@
+type Signals struct { time_min int  weekday int  weather string  occupancy float  pos_rate int  event int  online int }
+type Track struct { id string  title string  mood string  energy float  bpm int  cached int }
+type Decision struct { energy float  mood string  bpm int  track string  title string  rule string  reason string  volume float  source string }
+
+func catalog() {
+    return []Track{
+        Track{id:"slow-tide",    title:"Slow Tide",           mood:"calm",        energy:0.12, bpm:72,  cached:1},
+        Track{id:"paper-moon",   title:"Paper Moon",          mood:"calm",        energy:0.22, bpm:80,  cached:1},
+        Track{id:"ember-line",   title:"Ember Line",          mood:"warm",        energy:0.30, bpm:86,  cached:1},
+        Track{id:"soft-proud",   title:"Soft Proud",          mood:"warm",        energy:0.38, bpm:92,  cached:0},
+        Track{id:"rainy-window", title:"Rainy Window",        mood:"warm",        energy:0.34, bpm:88,  cached:1},
+        Track{id:"morning-glass",title:"Morning Glass",       mood:"bright",      energy:0.48, bpm:100, cached:1},
+        Track{id:"seine-glow",   title:"Seine Glow",          mood:"bright",      energy:0.55, bpm:106, cached:1},
+        Track{id:"aloha-wave",   title:"Aloha Wave Momentum", mood:"bright",      energy:0.60, bpm:110, cached:0},
+        Track{id:"warm-wire",    title:"Warm Wire",           mood:"driving",     energy:0.68, bpm:116, cached:1},
+        Track{id:"rhythm-glow",  title:"Rhythm Glow",         mood:"driving",     energy:0.75, bpm:122, cached:1},
+        Track{id:"grand-opening",title:"Grand Opening",       mood:"celebratory", energy:0.85, bpm:126, cached:1},
+        Track{id:"fever",        title:"Fever",               mood:"driving",     energy:0.82, bpm:128, cached:0},
+        Track{id:"last-call",    title:"Last Call",           mood:"late",        energy:0.40, bpm:96,  cached:1},
+        Track{id:"neon-quiet",   title:"Neon Quiet",          mood:"late",        energy:0.28, bpm:84,  cached:1}
+    }
+}
+
+func clampf(x, lo, hi) { if x < lo { return lo }  if x > hi { return hi }  return x }
+
+func daypart(t) {
+    if t < 360  { return 0.15 }
+    if t < 540  { return 0.30 + (float(t - 360) / 180.0) * 0.20 }
+    if t < 720  { return 0.50 + (float(t - 540) / 180.0) * 0.15 }
+    if t < 840  { return 0.70 }
+    if t < 1020 { return 0.55 }
+    if t < 1200 { return 0.60 + (float(t - 1020) / 180.0) * 0.15 }
+    if t < 1260 { return 0.50 }
+    return 0.30
+}
+
+func pick_track(mood, target, offline) {
+    best := ""
+    best_d := 99.0
+    fallback := ""
+    fallback_d := 99.0
+    for _, tr := range catalog() {
+        if offline && tr.cached == 0 { continue }
+        d := tr.energy - target
+        if d < 0.0 { d = 0.0 - d }
+        if d < fallback_d { fallback_d = d  fallback = tr.id }
+        if tr.mood == mood && d < best_d { best_d = d  best = tr.id }
+    }
+    if best == "" { return fallback }
+    return best
+}
+
+func track_of(id) {
+    for _, tr := range catalog() { if tr.id == id { return tr } }
+    return Track{}
+}
+
+func decide_sig(s) {
+    e := daypart(s.time_min)
+    rules := []string{}
+    reasons := []string{}
+    if s.time_min >= 720 && s.time_min < 840 { rules = append(rules, "lunch-peak")  reasons = append(reasons, "lunch peak") }
+    if s.time_min >= 1020 && s.time_min < 1200 { rules = append(rules, "evening-rise")  reasons = append(reasons, "evening rise") }
+    if s.occupancy > 0.75 { e = e + 0.12  rules = append(rules, "rush")  reasons = append(reasons, "packed floor") }
+    if s.occupancy < 0.15 { e = e - 0.10  rules = append(rules, "empty-floor")  reasons = append(reasons, "near-empty floor") }
+    if s.weather == "rain" { e = e - 0.05  rules = append(rules, "rain-soften")  reasons = append(reasons, "rain outside") }
+    if s.weather == "snow" { e = e - 0.03  rules = append(rules, "snow-hush")  reasons = append(reasons, "snow outside") }
+    if s.pos_rate >= 25 { e = e + 0.08  rules = append(rules, "pos-surge")  reasons = append(reasons, "till is ringing") }
+    if s.event == 1 { e = e + 0.10  rules = append(rules, "local-event")  reasons = append(reasons, "local event on") }
+    if s.weekday == 0 && s.time_min >= 1020 { e = e + 0.05  rules = append(rules, "weekend-evening")  reasons = append(reasons, "weekend evening") }
+    e = clampf(e, 0.05, 1.0)
+    mood := "calm"
+    if s.event == 1 { mood = "celebratory" }
+    if s.event == 0 {
+        if e >= 0.62 { mood = "driving" }
+        if e >= 0.40 && e < 0.62 { mood = "bright" }
+        if e < 0.40 { mood = "calm" }
+        if (s.weather == "rain" || s.weather == "snow") && e < 0.62 { mood = "warm" }
+    }
+    if (s.time_min >= 1260 || s.time_min < 360) && s.event == 0 { mood = "late" }
+    d := Decision{}
+    d.energy = e
+    d.mood = mood
+    d.source = "live"
+    if s.online == 0 { d.source = "cache" }
+    d.track = pick_track(mood, e, s.online == 0)
+    tr := track_of(d.track)
+    d.title = tr.title
+    d.bpm = tr.bpm
+    d.volume = clampf(0.5 + s.occupancy * 0.35, 0.40, 0.90)
+    d.rule = join(rules, ",")
+    if len(reasons) == 0 { reasons = append(reasons, "steady daypart") }
+    rsn := join(reasons, " + ") + " -> " + mood
+    if s.online == 0 { rsn = "OFFLINE (cached catalog): " + rsn }
+    d.reason = rsn
+    return d
+}
+
+func decide_json(sj) {
+    s := parse(sj, Signals{})
+    return json(decide_sig(s))
+}
+
+export func input_buf(n) (p) { p = alloc(n + 1) }
+export func decide(p) (r) { sj := ptr_str(p)  free(p)  r = decide_json(sj) }
+export func catalog_json() (r) { r = json(catalog()) }
