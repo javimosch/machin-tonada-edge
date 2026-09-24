@@ -44,13 +44,13 @@ function applyDecision(d) {
   $('np-meta').textContent = `${d.track || '—'} · ${d.mood || '—'} · ${d.bpm || '—'} bpm · energy ${(d.energy || 0).toFixed(2)}`;
   $('energy-bar').style.width = ((d.energy || 0) * 100) + '%';
   const src = $('np-src');
-  const offline = LIVE ? !d.online : d.source === 'cache';
-  src.textContent = LIVE ? (d.online ? (d.source === 'cache' ? 'BOX LIVE · ON CACHE' : 'BOX LIVE') : 'BOX OFFLINE')
-                         : (d.source === 'cache' ? 'OFFLINE · CACHED' : 'LIVE');
+  const offline = liveMode() ? !d.online : d.source === 'cache';
+  src.textContent = liveMode() ? (d.online ? (d.source === 'cache' ? 'BOX LIVE · ON CACHE' : 'BOX LIVE') : 'BOX OFFLINE')
+                             : (d.source === 'cache' ? 'OFFLINE · CACHED' : 'LIVE');
   src.className = 'badge ' + (offline ? 'cache' : 'live');
   $('reason').textContent = d.reason || '';
   scene.setLED(d);
-  if (LIVE) scene.setPower(!!d.online);       // the box itself is playing; audio btn is just a monitor
+  if (liveMode()) scene.setPower(!!d.online);  // the box itself is playing; audio btn is just a monitor
   if (state.audio && state.playing) audio.setDecision(d);
   if (d.track !== lastTrack) {
     if (lastTrack) log(`♪ ${d.title}  [${d.mood} · e${(d.energy || 0).toFixed(2)}${d.source === 'cache' ? ' · cache' : ''}]`);
@@ -65,34 +65,49 @@ function decide() {
   });
 }
 
-// Live-box mode: this artifact's data.json carries the fleet (pushed by
-// `hart refresh --url <bkn hook?op=fleet>`). ?zone=<id> or the picker selects
-// which box to mirror; the sim controls are hidden.
-const LIVE = Array.isArray(window.HART_DATA) && window.HART_DATA.length > 0;
-if (LIVE) {
-  $('sim-card').style.display = 'none';
-  $('day-btn').style.display = 'none';
-  $('audio-btn').textContent = '▶ listen to this box';
-  $('box-audio').textContent = '▶ listen to this box';
-  const sel = $('zone-pick');
-  sel.style.display = '';
-  let zones = {};
-  let current = new URLSearchParams(location.search).get('zone') || '';
-  const paintLive = d => { if (d && d.id) { $('z-name').textContent = d.name + ' · ' + d.city + ', ' + d.country; applyDecision(d); } };
-  const rebuild = arr => {
-    zones = {}; arr.forEach(z => zones[z.id] = z);
-    sel.innerHTML = arr.map(z => `<option value="${z.id}" ${z.id === current ? 'selected' : ''}>${z.name} · ${z.city}</option>`).join('');
-    if (!zones[current]) { current = arr[0].id; sel.value = current; }
-    paintLive(zones[current]);
-  };
-  rebuild(window.HART_DATA);
-  addEventListener('hart:data', e => rebuild(e.detail));
-  sel.onchange = () => {
-    current = sel.value;
-    history.replaceState(null, '', '?zone=' + current);  // keep the deep link shareable
-    paintLive(zones[current]);
-  };
-}
+// One page, two modes:
+//   sim  — interactive sliders drive the wasm engine (default, no ?zone=)
+//   live — mirror a real zone daemon (?zone=<id> or the picker)
+// Fleet data arrives via `hart refresh --url <bkn ?op=fleet>` -> HART_DATA.
+const fleet = Array.isArray(window.HART_DATA) ? window.HART_DATA : [];
+const zones = {};
+fleet.forEach(z => zones[z.id] = z);
+let current = new URLSearchParams(location.search).get('zone') || 'sim';
+const liveMode = () => current !== 'sim' && !!zones[current];
+const sel = $('zone-pick');
+if (fleet.length) sel.style.display = '';
+
+const paintLive = d => { if (d && d.id) { $('z-name').textContent = d.name + ' · ' + d.city + ', ' + d.country; applyDecision(d); } };
+const rebuildSel = () => {
+  sel.innerHTML = `<option value="sim" ${current === 'sim' ? 'selected' : ''}>simulator · interactive</option>` +
+    fleet.map(z => `<option value="${z.id}" ${z.id === current ? 'selected' : ''}>live · ${z.name} · ${z.city}</option>`).join('');
+};
+const setMode = () => {
+  const live = liveMode();
+  $('sim-card').style.display = live ? 'none' : '';
+  $('day-btn').style.display = live ? 'none' : '';
+  for (const id of ['audio-btn', 'box-audio'])
+    $(id).textContent = state.playing ? '⏸ mute' : (live ? '▶ listen to this box' : '▶ start audio');
+  if (live) paintLive(zones[current]);
+  else {
+    $('z-name').textContent = 'simulator · interactive';
+    scene.setPower(state.playing);          // LED follows the sim's audio gate again
+    decide();
+  }
+};
+rebuildSel();
+sel.onchange = () => {
+  current = sel.value;
+  history.replaceState(null, '', liveMode() ? '?zone=' + current : '?sim');  // shareable deep link
+  setMode();
+};
+addEventListener('hart:data', e => {
+  if (!Array.isArray(e.detail)) return;
+  fleet.length = 0; e.detail.forEach(z => { fleet.push(z); zones[z.id] = z; });
+  rebuildSel();
+  if (liveMode()) paintLive(zones[current]);
+});
+setMode();
 
 // --- wire controls
 const fmtT = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
@@ -116,12 +131,12 @@ function toggleAudio() {
   if (state.playing && lastD) audio.setDecision(lastD);   // feed the engine immediately — don't wait for the next repaint/push
   for (const id of ['audio-btn', 'box-audio']) {
     const b = $(id); if (!b) continue;
-    b.textContent = state.playing ? '⏸ mute' : (LIVE ? '▶ listen to this box' : '▶ start audio');
+    b.textContent = state.playing ? '⏸ mute' : (liveMode() ? '▶ listen to this box' : '▶ start audio');
     b.classList.toggle('on', state.playing);
   }
-  if (!LIVE) scene.setPower(state.playing);
-  log(state.playing ? '▶ playing' : (LIVE ? '⏸ muted' : '⏸ paused — LED off'));
-  if (!LIVE) decide();
+  if (!liveMode()) scene.setPower(state.playing);
+  log(state.playing ? '▶ playing' : (liveMode() ? '⏸ muted' : '⏸ paused — LED off'));
+  if (!liveMode()) decide();
 }
 $('audio-btn').onclick = toggleAudio;
 $('box-audio').onclick = e => { e.stopPropagation(); toggleAudio(); };
@@ -153,5 +168,4 @@ $('day-btn').onclick = () => {
   }, 100);
 };
 
-if (!LIVE) decide();
-log('edge-core.wasm loaded — ' + engine.catalog().length + ' tracks in catalog' + (LIVE ? ' · live box mode' : ''));
+log('edge-core.wasm loaded — ' + engine.catalog().length + ' tracks in catalog' + (liveMode() ? ' · live box mode' : ' · simulator'));

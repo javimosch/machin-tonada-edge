@@ -9,9 +9,8 @@ wasm module that runs the *same* logic in your browser.
 
 | | |
 |---|---|
-| **Interactive simulator** (3D box + wasm engine + generative audio) | https://hart.intrane.fr/a/javimosch/tonada-edge |
+| **Device page** — one artifact, two modes: simulator (default) / live box (`?zone=`) | https://hart.intrane.fr/a/javimosch/tonada-box |
 | **Fleet dashboard** (7 zones, live heartbeats from real daemons) | https://hart.intrane.fr/a/javimosch/tonada-fleet |
-| **Live box view** — pick a zone or deep-link: | `https://hart.intrane.fr/a/javimosch/tonada-box?zone=<id>` |
 | Stockholm · Norrland Flagship | https://hart.intrane.fr/a/javimosch/tonada-box?zone=norrland-sthlm |
 | Singapore · Norrland Orchard | https://hart.intrane.fr/a/javimosch/tonada-box?zone=norrland-sg |
 | Berlin · Café Berg Mitte | https://hart.intrane.fr/a/javimosch/tonada-box?zone=cafeberg-mitte |
@@ -20,12 +19,13 @@ wasm module that runs the *same* logic in your browser.
 | New York · Meridian Supply SoHo | https://hart.intrane.fr/a/javimosch/tonada-box?zone=meridian-soho |
 | Dubai · Dune Beach Club | https://hart.intrane.fr/a/javimosch/tonada-box?zone=dune-marina |
 
-Each live box hart mirrors that zone's daemon: the 3D box shows the real
-decision, mood-colored LED, and online/cache state, pushed server-side every
-30s (`hart refresh --url` → bkn `op=fleet` hook → `window.HART_DATA`), with a
-zone picker and `?zone=` deep links. The fleet
-page is strict-CSP: no fetch at all — its data is pushed the same way
-(`op=fleet`). Zone names on the fleet page link to their box hart.
+The device page runs in two modes on one artifact: with no `?zone=` it is the
+interactive simulator (sliders drive the wasm engine, CUT THE NETWORK shows the
+cached-catalog fallback); with `?zone=<id>` it mirrors that zone's real daemon —
+decision, mood-colored LED, online/cache state, "listen to this box" monitor —
+pushed server-side every 30s (`hart refresh --url` → bkn `op=fleet` →
+`window.HART_DATA`). The picker switches between sim and any live zone, and the
+fleet page deep-links each zone into it. Both harts are strict-CSP.
 
 ## Architecture
 
@@ -59,6 +59,7 @@ page is strict-CSP: no fetch at all — its data is pushed the same way
 - `src/control-plane.src` — standalone MFL control plane (dev alternative to bkn)
 - `bkn/` — control plane as bkn scripts/hooks/cron (`setup.sh` deploys)
 - `demo/` — device page (three.js + WebAudio) and fleet dashboard
+- `deploy/` — vps1 fleet: `tonada-edge@.service` template + `deploy.sh` (build → scp → systemd)
 - `assets/` — Blender box model, GLB export, wasm build
 - `build.sh` — native + wasm builds; `build-hart.py` — self-contained artifacts
 

@@ -1,0 +1,15 @@
+[Unit]
+Description=tonada-edge daemon (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=%h/tonada-edge
+ExecStart=%h/tonada-edge/tonada-edge run --server=https://bkn.intrane.fr --zone=%i --interval=3000 --data-dir=%h/tonada-edge/state
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
