@@ -56,6 +56,21 @@ function main(d) {
     return { status: 200, body: { ok: true } };
   }
 
+  if (op === "zone") { // one zone's composed record — per-box hart data source
+    const z = bkn.store.get("tonada/zones", zid);
+    if (!z) return { status: 404, body: { ok: false, error: "unknown zone " + zid } };
+    const s = getSignals(zid);
+    const beat = bkn.store.get("tonada/beats", zid);
+    const fresh = !!(beat && beat.ts && (Date.now() - beat.ts < 20000));
+    const it = { id: z.id, name: z.name, brand: z.brand, city: z.city, country: z.country,
+      tz_off: z.tz_off, online: fresh, last_seen: beat ? beat.ts : 0,
+      weather: s.weather, occupancy: s.occupancy, pos_rate: s.pos_rate, event: s.event || 0 };
+    if (beat) { it.track = beat.track; it.title = beat.title; it.mood = beat.mood;
+                it.energy = beat.energy; it.bpm = beat.bpm; it.source = beat.source;
+                it.reason = beat.reason; it.uptime_s = beat.uptime_s; }
+    return { status: 200, body: it };
+  }
+
   if (op === "fleet") { // composed read for the dashboard / hart data push
     const zones = bkn.store.list("tonada/zones", { limit: 50, order_by: "id" });
     const now = Date.now();

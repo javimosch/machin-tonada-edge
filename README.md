@@ -11,10 +11,15 @@ wasm module that runs the *same* logic in your browser.
 |---|---|
 | **Virtual device** (3D box + wasm engine + generative audio) | https://hart.intrane.fr/a/javimosch/tonada-edge |
 | **Fleet dashboard** (live heartbeats from real daemons) | https://hart.intrane.fr/a/javimosch/tonada-fleet |
+| **Box · Norrland Flagship** (Stockholm) | https://hart.intrane.fr/a/javimosch/tonada-box-norrland-sthlm |
+| **Box · Norrland Orchard** (Singapore) | https://hart.intrane.fr/a/javimosch/tonada-box-norrland-sg |
+| **Box · Café Berg Mitte** (Berlin) | https://hart.intrane.fr/a/javimosch/tonada-box-cafeberg-mitte |
 
-The fleet page is strict-CSP: no fetch at all. Its data is pushed server-side —
-`hart refresh --url` pulls the bkn fleet hook every 30s and repaints via
-`window.HART_DATA`.
+Each box hart is a live view into that zone's daemon: the 3D box shows the real
+decision, mood-colored LED, and online/cache state, pushed server-side every
+30s (`hart refresh --url` → bkn `op=zone` hook → `window.HART_DATA`). The fleet
+page is strict-CSP: no fetch at all — its data is pushed the same way
+(`op=fleet`). Zone names on the fleet page link to their box hart.
 
 ## Architecture
 

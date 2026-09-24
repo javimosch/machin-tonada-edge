@@ -40,7 +40,7 @@
 <body>
 <div id="view"></div>
 <div id="panel">
-  <h1>tonada<span>·</span>edge <span class="hint">virtual device</span></h1>
+  <h1>tonada<span>·</span>edge <span class="hint" id="z-name">virtual device</span></h1>
   <div class="card">
     <div id="np-title">—</div>
     <div id="np-meta"></div>
@@ -48,7 +48,7 @@
     <div style="margin-top:6px"><span id="np-src" class="badge live">LIVE</span></div>
     <div id="reason"></div>
   </div>
-  <div class="card">
+  <div class="card" id="sim-card">
     <div class="row"><label>time of day</label><input id="s-time" type="range" min="0" max="1439" value="780"><output id="o-time">13:00</output></div>
     <div class="row"><label>weather</label><select id="s-weather"><option>clear</option><option>clouds</option><option selected>rain</option><option>snow</option></select><output></output></div>
     <div class="row"><label>foot traffic</label><input id="s-occ" type="range" min="0" max="100" value="75"><output id="o-occ">75%</output></div>

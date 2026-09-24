@@ -38,25 +38,42 @@ function signals() {
 }
 
 let lastTrack = '', queued = false;
+function applyDecision(d) {
+  $('np-title').textContent = d.title || '—';
+  $('np-meta').textContent = `${d.track || '—'} · ${d.mood || '—'} · ${d.bpm || '—'} bpm · energy ${(d.energy || 0).toFixed(2)}`;
+  $('energy-bar').style.width = ((d.energy || 0) * 100) + '%';
+  const src = $('np-src');
+  const offline = LIVE ? !d.online : d.source === 'cache';
+  src.textContent = LIVE ? (d.online ? (d.source === 'cache' ? 'BOX LIVE · ON CACHE' : 'BOX LIVE') : 'BOX OFFLINE')
+                         : (d.source === 'cache' ? 'OFFLINE · CACHED' : 'LIVE');
+  src.className = 'badge ' + (offline ? 'cache' : 'live');
+  $('reason').textContent = d.reason || '';
+  scene.setLED(d);
+  if (LIVE) scene.setPower(!!d.online);       // the box itself is playing; audio btn is just a monitor
+  if (state.audio && state.playing) audio.setDecision(d);
+  if (d.track !== lastTrack) {
+    if (lastTrack) log(`♪ ${d.title}  [${d.mood} · e${(d.energy || 0).toFixed(2)}${d.source === 'cache' ? ' · cache' : ''}]`);
+    lastTrack = d.track;
+  }
+}
 function decide() {
   if (queued) return; queued = true;
   requestAnimationFrame(() => {
     queued = false;
-    const d = engine.decide(signals());
-    $('np-title').textContent = d.title;
-    $('np-meta').textContent = `${d.track} · ${d.mood} · ${d.bpm} bpm · energy ${d.energy.toFixed(2)}`;
-    $('energy-bar').style.width = (d.energy * 100) + '%';
-    const src = $('np-src');
-    src.textContent = d.source === 'cache' ? 'OFFLINE · CACHED' : 'LIVE';
-    src.className = 'badge ' + (d.source === 'cache' ? 'cache' : 'live');
-    $('reason').textContent = d.reason;
-    scene.setLED(d);
-    if (state.audio && state.playing) audio.setDecision(d);
-    if (d.track !== lastTrack) {
-      if (lastTrack) log(`♪ ${d.title}  [${d.mood} · e${d.energy.toFixed(2)}${d.source === 'cache' ? ' · cache' : ''}]`);
-      lastTrack = d.track;
-    }
+    applyDecision(engine.decide(signals()));
   });
+}
+
+// Live-box mode: this artifact's data.json carries one zone's real heartbeat
+// (pushed by `hart refresh --url <bkn hook?op=zone>`). The sim controls are
+// hidden; the 3D box mirrors the actual daemon.
+const LIVE = !!(window.HART_DATA && window.HART_DATA.id);
+if (LIVE) {
+  $('sim-card').style.display = 'none';
+  $('day-btn').style.display = 'none';
+  const paintLive = d => { if (d && d.id) { $('z-name').textContent = d.name + ' · ' + d.city + ', ' + d.country; applyDecision(d); } };
+  paintLive(window.HART_DATA);
+  addEventListener('hart:data', e => paintLive(e.detail));
 }
 
 // --- wire controls
@@ -75,14 +92,15 @@ $('kill').onclick = e => {
   decide();
 };
 
+if (LIVE) $('audio-btn').textContent = '▶ listen to this box';
 $('audio-btn').onclick = e => {
   if (!state.audio) { audio.start(); state.audio = true; state.playing = true; }
   else state.playing = audio.toggle();
-  e.target.textContent = state.playing ? '⏸ pause' : '▶ resume';
+  e.target.textContent = state.playing ? '⏸ mute' : (LIVE ? '▶ listen to this box' : '▶ resume');
   e.target.classList.toggle('on', state.playing);
-  scene.setPower(state.playing);
-  log(state.playing ? '▶ playing' : '⏸ paused — LED off');
-  decide();
+  if (!LIVE) scene.setPower(state.playing);
+  log(state.playing ? '▶ playing' : (LIVE ? '⏸ muted' : '⏸ paused — LED off'));
+  if (!LIVE) decide();
 };
 
 // --- "a day in 60s": scripted sweep 06:00 -> 23:00 with weather + traffic arcs
@@ -111,5 +129,5 @@ $('day-btn').onclick = () => {
   }, 100);
 };
 
-decide();
-log('edge-core.wasm loaded — ' + engine.catalog().length + ' tracks in catalog');
+if (!LIVE) decide();
+log('edge-core.wasm loaded — ' + engine.catalog().length + ' tracks in catalog' + (LIVE ? ' · live box mode' : ''));
