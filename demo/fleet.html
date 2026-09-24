@@ -68,7 +68,7 @@ async function j(url, opt) { const r = await fetch(API + url, opt); return r.ok 
 function zoneCard(z) {
   const el = document.createElement('div'); el.className = 'zone'; el.id = 'z-' + z.id;
   el.innerHTML = `
-    <div class="z-head"><div><span class="dot off"></span><a class="z-name" style="color:inherit" href="https://hart.intrane.fr/a/javimosch/tonada-box-${z.id}">${z.name}</a>
+    <div class="z-head"><div><span class="dot off"></span><a class="z-name" style="color:inherit" href="https://hart.intrane.fr/a/javimosch/tonada-box?zone=${z.id}">${z.name}</a>
       <div class="z-sub">${z.brand} · ${z.city}, ${z.country}</div></div>
       <div class="z-clock" data-clock="${z.tz_off}">${localTime(z.tz_off)}</div></div>
     <div class="np none">no heartbeat yet</div>

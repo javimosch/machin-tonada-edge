@@ -1,5 +1,9 @@
 [
   {"id":"norrland-sthlm","name":"Norrland Flagship","brand":"Norrland Outdoor","city":"Stockholm","country":"SE","lat":59.33,"lon":18.07,"tz_off":1},
   {"id":"norrland-sg","name":"Norrland Orchard","brand":"Norrland Outdoor","city":"Singapore","country":"SG","lat":1.30,"lon":103.83,"tz_off":8},
-  {"id":"cafeberg-mitte","name":"Café Berg Mitte","brand":"Café Berg","city":"Berlin","country":"DE","lat":52.52,"lon":13.40,"tz_off":1}
+  {"id":"cafeberg-mitte","name":"Café Berg Mitte","brand":"Café Berg","city":"Berlin","country":"DE","lat":52.52,"lon":13.40,"tz_off":1},
+  {"id":"cafemarea-mdp","name":"Café Marea Costa","brand":"Café Marea","city":"Mar del Plata","country":"AR","lat":-38.00,"lon":-57.55,"tz_off":-3},
+  {"id":"kinu-shibuya","name":"Kinu Hi-Fi Shibuya","brand":"Kinu Hi-Fi","city":"Tokyo","country":"JP","lat":35.66,"lon":139.70,"tz_off":9},
+  {"id":"meridian-soho","name":"Meridian Supply SoHo","brand":"Meridian Supply","city":"New York","country":"US","lat":40.72,"lon":-74.00,"tz_off":-4},
+  {"id":"dune-marina","name":"Dune Beach Club","brand":"Dune","city":"Dubai","country":"AE","lat":25.08,"lon":55.14,"tz_off":4}
 ]

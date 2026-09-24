@@ -65,18 +65,33 @@ function decide() {
   });
 }
 
-// Live-box mode: this artifact's data.json carries one zone's real heartbeat
-// (pushed by `hart refresh --url <bkn hook?op=zone>`). The sim controls are
-// hidden; the 3D box mirrors the actual daemon.
-const LIVE = !!(window.HART_DATA && window.HART_DATA.id);
+// Live-box mode: this artifact's data.json carries the fleet (pushed by
+// `hart refresh --url <bkn hook?op=fleet>`). ?zone=<id> or the picker selects
+// which box to mirror; the sim controls are hidden.
+const LIVE = Array.isArray(window.HART_DATA) && window.HART_DATA.length > 0;
 if (LIVE) {
   $('sim-card').style.display = 'none';
   $('day-btn').style.display = 'none';
   $('audio-btn').textContent = '▶ listen to this box';
   $('box-audio').textContent = '▶ listen to this box';
+  const sel = $('zone-pick');
+  sel.style.display = '';
+  let zones = {};
+  let current = new URLSearchParams(location.search).get('zone') || '';
   const paintLive = d => { if (d && d.id) { $('z-name').textContent = d.name + ' · ' + d.city + ', ' + d.country; applyDecision(d); } };
-  paintLive(window.HART_DATA);
-  addEventListener('hart:data', e => paintLive(e.detail));
+  const rebuild = arr => {
+    zones = {}; arr.forEach(z => zones[z.id] = z);
+    sel.innerHTML = arr.map(z => `<option value="${z.id}" ${z.id === current ? 'selected' : ''}>${z.name} · ${z.city}</option>`).join('');
+    if (!zones[current]) { current = arr[0].id; sel.value = current; }
+    paintLive(zones[current]);
+  };
+  rebuild(window.HART_DATA);
+  addEventListener('hart:data', e => rebuild(e.detail));
+  sel.onchange = () => {
+    current = sel.value;
+    history.replaceState(null, '', '?zone=' + current);  // keep the deep link shareable
+    paintLive(zones[current]);
+  };
 }
 
 // --- wire controls

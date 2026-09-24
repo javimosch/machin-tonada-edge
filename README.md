@@ -9,15 +9,21 @@ wasm module that runs the *same* logic in your browser.
 
 | | |
 |---|---|
-| **Virtual device** (3D box + wasm engine + generative audio) | https://hart.intrane.fr/a/javimosch/tonada-edge |
-| **Fleet dashboard** (live heartbeats from real daemons) | https://hart.intrane.fr/a/javimosch/tonada-fleet |
-| **Box · Norrland Flagship** (Stockholm) | https://hart.intrane.fr/a/javimosch/tonada-box-norrland-sthlm |
-| **Box · Norrland Orchard** (Singapore) | https://hart.intrane.fr/a/javimosch/tonada-box-norrland-sg |
-| **Box · Café Berg Mitte** (Berlin) | https://hart.intrane.fr/a/javimosch/tonada-box-cafeberg-mitte |
+| **Interactive simulator** (3D box + wasm engine + generative audio) | https://hart.intrane.fr/a/javimosch/tonada-edge |
+| **Fleet dashboard** (7 zones, live heartbeats from real daemons) | https://hart.intrane.fr/a/javimosch/tonada-fleet |
+| **Live box view** — pick a zone or deep-link: | `https://hart.intrane.fr/a/javimosch/tonada-box?zone=<id>` |
+| Stockholm · Norrland Flagship | https://hart.intrane.fr/a/javimosch/tonada-box?zone=norrland-sthlm |
+| Singapore · Norrland Orchard | https://hart.intrane.fr/a/javimosch/tonada-box?zone=norrland-sg |
+| Berlin · Café Berg Mitte | https://hart.intrane.fr/a/javimosch/tonada-box?zone=cafeberg-mitte |
+| Mar del Plata · Café Marea Costa | https://hart.intrane.fr/a/javimosch/tonada-box?zone=cafemarea-mdp |
+| Tokyo · Kinu Hi-Fi Shibuya | https://hart.intrane.fr/a/javimosch/tonada-box?zone=kinu-shibuya |
+| New York · Meridian Supply SoHo | https://hart.intrane.fr/a/javimosch/tonada-box?zone=meridian-soho |
+| Dubai · Dune Beach Club | https://hart.intrane.fr/a/javimosch/tonada-box?zone=dune-marina |
 
-Each box hart is a live view into that zone's daemon: the 3D box shows the real
+Each live box hart mirrors that zone's daemon: the 3D box shows the real
 decision, mood-colored LED, and online/cache state, pushed server-side every
-30s (`hart refresh --url` → bkn `op=zone` hook → `window.HART_DATA`). The fleet
+30s (`hart refresh --url` → bkn `op=fleet` hook → `window.HART_DATA`), with a
+zone picker and `?zone=` deep links. The fleet
 page is strict-CSP: no fetch at all — its data is pushed the same way
 (`op=fleet`). Zone names on the fleet page link to their box hart.
 
