@@ -85,6 +85,19 @@ export class AudioEngine {
       o.connect(og); og.connect(flt); o.start(); deck.nodes.push(o); return o;
     });
     this.deck = deck;
+    // generated-clip mode: if the build embedded an mp3 for this track id, loop
+    // it through the deck's filter/gain instead of the synth layers
+    const clipB64 = (window.__CLIPS__ || {})[d.track];
+    if (clipB64) {
+      deck.clipMode = true;
+      const bin = atob(clipB64), u8 = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+      ctx.decodeAudioData(u8.buffer).then(buf => {
+        if (this.deck !== deck) return;
+        const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+        src.connect(flt); src.start(); deck.nodes.push(src);
+      }).catch(() => { deck.clipMode = false; });
+    }
   }
 
   schedule() {
@@ -100,7 +113,8 @@ export class AudioEngine {
   }
 
   playStep(s, t) {
-    const ctx = this.ctx, dk = this.deck, cfg = dk.cfg, deg = cfg.scale, r = dk.r;
+    const ctx = this.ctx, dk = this.deck, cfg = dk.cfg, deg = cfg.scale;
+    if (dk.clipMode) return;                     // generated clip is looping; no synth layers
     const bar = Math.floor(s / 16), st = s % 16;
     const chordRoot = cfg.root + deg[dk.chords[bar]];
     const tt = t + (st % 2 === 1 ? dk.stepDur * dk.swing : 0);   // per-track swing on off-16ths

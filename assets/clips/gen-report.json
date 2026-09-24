@@ -1,0 +1,62 @@
+[
+ {
+  "track": "slow-tide",
+  "mood": "calm",
+  "bpm": 72,
+  "gen_s": 32.3
+ },
+ {
+  "track": "paper-moon",
+  "mood": "calm",
+  "bpm": 80,
+  "gen_s": 30.9
+ },
+ {
+  "track": "ember-line",
+  "mood": "warm",
+  "bpm": 86,
+  "gen_s": 30.8
+ },
+ {
+  "track": "rainy-window",
+  "mood": "warm",
+  "bpm": 88,
+  "gen_s": 30.8
+ },
+ {
+  "track": "morning-glass",
+  "mood": "bright",
+  "bpm": 100,
+  "gen_s": 31.1
+ },
+ {
+  "track": "seine-glow",
+  "mood": "bright",
+  "bpm": 106,
+  "gen_s": 30.9
+ },
+ {
+  "track": "warm-wire",
+  "mood": "driving",
+  "bpm": 116,
+  "gen_s": 30.4
+ },
+ {
+  "track": "rhythm-glow",
+  "mood": "driving",
+  "bpm": 122,
+  "gen_s": 30.9
+ },
+ {
+  "track": "grand-opening",
+  "mood": "celebratory",
+  "bpm": 126,
+  "gen_s": 30.9
+ },
+ {
+  "track": "last-call",
+  "mood": "late",
+  "bpm": 96,
+  "gen_s": 31.0
+ }
+]

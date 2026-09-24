@@ -32,10 +32,22 @@ assets = (
     f"'tonada-edge-box.glb':'{b64(ROOT / 'assets/tonada-edge-box.glb')}'"
     "};</script>")
 
+# generated MusicGen clips (assets/clips/<track>.mp3) — embedded so the box can
+# play real generated audio instead of the synth stand-in
+clips_dir = ROOT / "assets/clips"
+clips = ""
+if clips_dir.is_dir():
+    entries = ",\n".join(
+        f"'{p.stem}':'{b64(p)}'" for p in sorted(clips_dir.glob("*.mp3")))
+    if entries:
+        clips = f"<script>window.__CLIPS__={{\n{entries}\n}};</script>"
+        print(f"embedded {len(list(clips_dir.glob('*.mp3')))} clips "
+              f"({sum(p.stat().st_size for p in clips_dir.glob('*.mp3'))/1e3:.0f} KB)")
+
 # strip the importmap + module script tag, splice in assets + bundle
 index = re.sub(r'<script type="importmap">.*?</script>', "", index, flags=re.S)
 index = index.replace('<script type="module" src="js/app.js"></script>',
-                      assets + "\n<script type=\"module\">" + bundle + "</script>")
+                      assets + clips + "\n<script type=\"module\">" + bundle + "</script>")
 out = DIST / "tonada-edge-device.html"
 out.write_text(index)
 print(f"{out}  {out.stat().st_size/1e6:.2f} MB")
