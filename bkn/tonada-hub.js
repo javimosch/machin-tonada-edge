@@ -61,7 +61,7 @@ function main(d) {
     if (!z) return { status: 404, body: { ok: false, error: "unknown zone " + zid } };
     const s = getSignals(zid);
     const beat = bkn.store.get("tonada/beats", zid);
-    const fresh = !!(beat && beat.ts && (Date.now() - beat.ts < 20000));
+    const fresh = !!(beat && beat.ts && (Date.now() - beat.ts < 90000));
     const it = { id: z.id, name: z.name, brand: z.brand, city: z.city, country: z.country,
       tz_off: z.tz_off, online: fresh, last_seen: beat ? beat.ts : 0,
       weather: s.weather, occupancy: s.occupancy, pos_rate: s.pos_rate, event: s.event || 0 };
@@ -77,7 +77,7 @@ function main(d) {
     const out = zones.map(function (z) {
       const s = getSignals(z.id);
       const beat = bkn.store.get("tonada/beats", z.id);
-      const fresh = !!(beat && beat.ts && (now - beat.ts < 20000));
+      const fresh = !!(beat && beat.ts && (now - beat.ts < 90000));
       const hist = bkn.store.list("tonada/hist", { where: { zone_id: z.id }, limit: 40 })
         .map(function (h) { return { energy: h.energy }; });
       const it = { id: z.id, name: z.name, brand: z.brand, city: z.city, country: z.country,
